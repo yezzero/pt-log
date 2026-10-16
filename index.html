@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PT일지">
+<meta name="theme-color" content="#F1F2EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141816" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>PT일지</title>
+<style>
+:root{
+  --bg:#F1F2EE; --surface:#FFFFFF; --surface-2:#E4E7E1; --ink:#17201B; --muted:#66706A;
+  --line:#D3D8D0; --accent:#1F6F4A; --on-accent:#FFFFFF; --hi:#F3C13A; --on-hi:#17201B;
+  --warn:#C2412D; --scrim:rgba(20,24,22,.45);
+  --head-h:120px;
+  /* 하단 여백: 홈 화면 앱은 홈 인디케이터 영역, 일반 브라우저에서도 최소 16px */
+  --safe-b:max(env(safe-area-inset-bottom), 16px);
+  /* 아이폰 기준 레이아웃. 태블릿·PC처럼 넓은 화면에서는 이 폭으로 가운데 정렬 */
+  --app-w:600px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#141816; --surface:#1E2421; --surface-2:#2A312D; --ink:#E9ECE7; --muted:#9AA39D;
+    --line:#353D38; --accent:#5BBE8A; --on-accent:#0E1A13; --hi:#F3C13A; --on-hi:#17201B;
+    --warn:#EE8A74; --scrim:rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{
+  font-family:-apple-system,"Apple SD Gothic Neo",Pretendard,system-ui,sans-serif;
+  font-variant-numeric:tabular-nums; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none; overscroll-behavior:none;
+}
+body.locked{overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* 헤더 + 카테고리 탭 */
+.head{position:sticky;top:0;z-index:5;background:var(--bg);padding-top:env(safe-area-inset-top);max-width:var(--app-w);margin:0 auto}
+.top{padding:14px 16px 10px;display:flex;align-items:flex-end;justify-content:space-between}
+.top h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em}
+.top p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.text-btn{font-size:16px;font-weight:600;color:var(--accent);padding:8px 4px}
+.tabs{display:flex;flex-wrap:nowrap;gap:5px;padding:0 16px 10px;border-bottom:1px solid var(--line)}
+.tab{flex:1 1 0;min-width:0;white-space:nowrap;height:42px;border-radius:12px;background:var(--surface-2);font-size:16px;font-weight:700}
+.tab.on{background:var(--ink);color:var(--bg)}
+
+/* 카테고리 섹션 */
+.list{padding:0 16px calc(var(--safe-b) + 104px);max-width:var(--app-w);margin:0 auto}
+.cat{scroll-margin-top:var(--head-h);padding-top:14px}
+.cat:last-of-type{min-height:calc(100dvh - var(--head-h) - 104px - var(--safe-b))}
+.cat-title{margin:0 2px 10px;font-size:18px;font-weight:800;display:flex;gap:6px;align-items:baseline}
+.cat-title span{font-size:14px;font-weight:600;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}
+
+/* 운동 타일 */
+.tile{
+  position:relative;aspect-ratio:1/1;border-radius:18px;
+  background:var(--surface);border:1px solid var(--line);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  padding:12px;text-align:center;
+}
+.tile:active{transform:scale(.97)}
+.tile-name{font-size:15px;font-weight:700;line-height:1.25;word-break:keep-all;overflow-wrap:anywhere}
+.tile-meta{font-size:13px;margin-top:2px;opacity:.85}
+.tile-order{
+  position:absolute;top:10px;left:10px;width:26px;height:26px;border-radius:13px;
+  display:grid;place-items:center;font-size:14px;font-weight:800;
+  background:var(--on-accent);color:var(--accent);
+}
+.tile.is-logged{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tile-add{border:1.5px dashed var(--line);background:transparent;color:var(--muted)}
+.tile-add .tile-name{font-weight:600;font-size:14px}
+.editing .tile:not(.tile-add){border-color:var(--muted)}
+.editing .tile:not(.tile-add)::after{
+  content:"삭제";position:absolute;top:10px;right:10px;font-size:12px;font-weight:700;
+  padding:3px 7px;border-radius:8px;background:var(--surface-2);color:var(--ink);
+}
+
+/* 백업 (편집 모드에서만) */
+.backup{margin-top:28px;padding:16px;border-radius:18px;background:var(--surface);border:1px solid var(--line)}
+.backup h2{margin:0 0 4px;font-size:17px;font-weight:800}
+.backup p{margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--muted)}
+.backup .sheet-actions{padding:0}
+
+/* 하단 고정 버튼 */
+.bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:6;max-width:var(--app-w);margin:0 auto;
+  padding:12px 16px calc(var(--safe-b) + 12px);
+  background:linear-gradient(to top,var(--bg) 70%,transparent);
+}
+.primary{width:100%;height:56px;border-radius:16px;font-size:18px;font-weight:800;background:var(--hi);color:var(--on-hi)}
+.primary:disabled{background:var(--surface-2);color:var(--muted)}
+.secondary{height:52px;padding:0 8px;border-radius:14px;font-size:16px;font-weight:700;line-height:1.2;word-break:keep-all;background:var(--surface-2);color:var(--ink)}
+.secondary.go{background:var(--accent);color:var(--on-accent)}
+.secondary.share{background:var(--hi);color:var(--on-hi)}
+
+/* 바텀시트 */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:var(--app-w);margin:0 auto;
+  background:var(--surface);border-radius:22px 22px 0 0;
+  max-height:92vh;max-height:92dvh;display:flex;flex-direction:column;
+  transform:translateY(100%);transition:transform .25s cubic-bezier(.2,.8,.2,1);
+  padding-bottom:calc(var(--safe-b) + 12px);
+}
+.sheet.open{transform:none}
+@media (prefers-reduced-motion: reduce){.sheet,.scrim{transition:none}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px}
+.sheet-head h2{margin:0;font-size:22px;font-weight:800;letter-spacing:-.01em}
+.sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px 0}
+
+/* 기록 줄 */
+.rows{overflow-y:auto;padding:0 16px;min-height:60px;flex:1 1 auto}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.row-main{
+  flex:1;display:flex;align-items:center;gap:14px;height:52px;padding:0 14px;
+  border-radius:14px;background:var(--surface-2);border:2px solid transparent;
+  font-size:clamp(17px,5vw,20px);font-weight:700;
+}
+.row.is-active .row-main{border-color:var(--accent);background:var(--surface)}
+.row-n{font-size:13px;color:var(--muted);width:14px}
+.v.empty{color:var(--muted);font-weight:500}
+.row-del{width:44px;height:52px;border-radius:14px;font-size:22px;color:var(--muted)}
+
+/* 숫자 선택 */
+.pickers{padding:10px 0 0;border-top:1px solid var(--line);margin-top:6px}
+.picker{display:flex;align-items:center;gap:8px;padding:6px 0 6px 16px}
+.picker-label{width:32px;font-size:14px;font-weight:700;color:var(--muted);flex:none}
+.chips{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;flex:1;padding:2px 0}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;min-width:42px;height:48px;padding:0 8px;border-radius:12px;background:var(--surface-2);font-size:18px;font-weight:700}
+.chip.on{background:var(--accent);color:var(--on-accent)}
+.step{display:flex;gap:4px;padding-right:16px;flex:none}
+.step button{width:38px;height:48px;border-radius:12px;border:1px solid var(--line);font-size:22px;font-weight:600}
+
+/* 텍스트 결과 */
+.out{
+  margin:0 16px;padding:16px;border-radius:14px;background:var(--surface-2);
+  font:600 17px/1.55 -apple-system,"Apple SD Gothic Neo",sans-serif;white-space:pre-wrap;
+  overflow-y:auto;max-height:52vh;max-height:52dvh;-webkit-user-select:text;user-select:text;
+}
+.reset{display:block;margin:14px auto 0;font-size:15px;color:var(--muted);padding:8px}
+.reset.armed{color:var(--warn);font-weight:700}
+
+/* 입력 */
+.field-label{margin:12px 16px 8px;font-size:14px;font-weight:700;color:var(--muted)}
+.add-input,.restore-input{
+  margin:0 16px;width:calc(100% - 32px);border-radius:14px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+  font-size:18px;padding:0 14px;-webkit-user-select:text;user-select:text;
+}
+.add-input{height:52px}
+.restore-input{height:140px;padding:12px 14px;font-size:15px;resize:none}
+.add-input:focus,.restore-input:focus{outline:2px solid var(--accent)}
+.cat-pick{display:flex;gap:6px;padding:0 16px}
+.cat-pick .chip{flex:1;font-size:16px}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(var(--safe-b) + 96px);z-index:40;
+  transform:translate(-50%,20px);opacity:0;transition:.2s;pointer-events:none;width:max-content;max-width:calc(100% - 32px);
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:700;font-size:15px;text-align:center;
+  display:flex;align-items:center;gap:14px;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.show.has-action{pointer-events:auto;padding:4px 6px 4px 16px}
+.toast-btn{flex:none;height:40px;padding:0 12px;border-radius:9px;font-weight:800;color:var(--hi)}
+</style>
+</head>
+<body>
+
+<div class="head" id="head">
+  <header class="top">
+    <div>
+      <h1>PT일지</h1>
+      <p id="today"></p>
+    </div>
+    <button class="text-btn" id="editBtn">편집</button>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="운동 카테고리"></nav>
+</div>
+
+<main class="list" id="list"></main>
+
+<div class="bar">
+  <button class="primary" id="convertBtn" disabled>텍스트로 변환하기</button>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- 운동 기록 시트 -->
+<section class="sheet" id="logSheet" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+  <div class="sheet-head">
+    <h2 id="logTitle"></h2>
+    <button class="text-btn" data-close>완료</button>
+  </div>
+  <div class="rows" id="rows"></div>
+  <div class="pickers" id="pickers"></div>
+  <div class="sheet-actions">
+    <button class="secondary" id="addRowBtn">+ 같은 값으로 줄 추가</button>
+    <button class="secondary go" data-close>완료</button>
+  </div>
+</section>
+
+<!-- 텍스트 결과 시트 -->
+<section class="sheet" id="outSheet" role="dialog" aria-modal="true" aria-labelledby="outTitle">
+  <div class="sheet-head">
+    <h2 id="outTitle">카톡으로 보낼 내용</h2>
+    <button class="text-btn" data-close>닫기</button>
+  </div>
+  <pre class="out" id="outText"></pre>
+  <div class="sheet-actions">
+    <button class="secondary" id="copyBtn">복사하기</button>
+    <button class="secondary share" id="shareBtn">공유하기</button>
+  </div>
+  <button class="reset" id="resetBtn">새 기록 시작</button>
+</section>
+
+<!-- 운동 추가 시트 -->
+<section class="sheet" id="addSheet" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+  <div class="sheet-head">
+    <h2 id="addTitle">운동 추가</h2>
+    <button class="text-btn" data-close>취소</button>
+  </div>
+  <div class="field-label">카테고리</div>
+  <div class="cat-pick" id="catPick"></div>
+  <div class="field-label">운동 이름</div>
+  <input class="add-input" id="addInput" placeholder="예: 케이블 킥백" maxlength="20" enterkeyhint="done" autocomplete="off">
+  <div class="sheet-actions" style="grid-template-columns:1fr">
+    <button class="primary" id="addSaveBtn">추가하기</button>
+  </div>
+</section>
+
+<!-- 백업 불러오기 시트 -->
+<section class="sheet" id="restoreSheet" role="dialog" aria-modal="true" aria-labelledby="restoreTitle">
+  <div class="sheet-head">
+    <h2 id="restoreTitle">백업 불러오기</h2>
+    <button class="text-btn" data-close>취소</button>
+  </div>
+  <div class="field-label">복사해둔 백업 내용을 붙여넣어 주세요</div>
+  <textarea class="restore-input" id="restoreInput" autocomplete="off" spellcheck="false"></textarea>
+  <div class="sheet-actions" style="grid-template-columns:1fr">
+    <button class="primary" id="restoreSaveBtn">이 내용으로 바꾸기</button>
+  </div>
+</section>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ───────── 설정: 이 부분만 고치면 선생님 스타일에 맞출 수 있어요 ───────── */
+const CATEGORIES  = ['하체','상체','코어','전신','기타'];
+const KG_PRESETS  = ['맨몸','빈바',5,10,15,20,25,30,35,40,50,60,70,80,100];
+const EA_PRESETS  = [5,6,8,10,12,15,16,20,25,30];
+const SET_PRESETS = [1,2,3,4,5];
+const STEP = { kg:2.5, ea:1, set:1 };
+const DEFAULT_EXERCISES = {
+  '하체':['데드리프트','루마니안데드리프트','런지','레그익스텐션','레그컬','레그프레스','불가리안스플릿스쿼트','스쿼트','힙어브덕션','힙쓰러스트'],
+  '상체':['덤벨프레스','랫풀다운','바벨로우','바이셉컬','벤치프레스','사이드레터럴레이즈','숄더프레스','시티드로우','트라이셉스푸시다운'],
+  '코어':['데드버그','레그레이즈','케이블크런치','크런치','플랭크'],
+  '전신':['버피','쓰러스터','케틀벨스윙','파머스워크'],
+  '기타':[]
+};
+
+/* ───────── 저장: 이 기기(폰) 안에만 저장 ─────────
+   홈 화면에 추가한 PWA는 Safari와 별도 저장소를 써요.
+   키 앞에 앱 이름을 붙여 같은 github.io 주소의 다른 프로젝트와 겹치지 않게 했어요. */
+const KEY = 'pt-log:v1';
+const mem = {};
+const ls = (() => {
+  try { localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return localStorage; }
+  catch { return null; }   // 미리보기 환경처럼 localStorage가 막힌 곳에서는 메모리로 대체
+})();
+const store = {
+  get(k){
+    try { const v = ls ? ls.getItem(`${KEY}:${k}`) : mem[k]; return v ? JSON.parse(v) : null; }
+    catch { return null; }
+  },
+  set(k, val){
+    const s = JSON.stringify(val);
+    try { ls ? ls.setItem(`${KEY}:${k}`, s) : (mem[k] = s); } catch { mem[k] = s; }
+  }
+};
+
+/* ───────── 상태 ───────── */
+let exercises = [];          // [{id,name,cat}]
+let session = [];            // [{exId,name,rows:[{kg,ea,set}]}] 기록한 순서대로 (앱이 꺼져도 유지)
+let editing = false;
+let activeExId = null;
+let activeRow = 0;
+let addCat = CATEGORIES[0];
+
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2,9);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const byName = (a,b) => a.name.localeCompare(b.name, 'ko');
+const parseVal = v => isNaN(Number(v)) ? v : Number(v);
+const fmtKg = k => typeof k === 'number' ? `${k}kg` : k;
+const isEmptyRow = r => r.kg == null && r.ea == null && r.set == null;
+const entryOf = id => session.find(s => s.exId === id);
+const saveExercises = () => store.set('exercises', exercises);
+const saveSession = () => store.set('session', session);
+
+function rowText(r){
+  return [
+    r.kg  != null ? fmtKg(r.kg)   : null,
+    r.ea  != null ? `${r.ea}ea`   : null,
+    r.set != null ? `${r.set}set` : null
+  ].filter(Boolean).join(' ');
+}
+
+/* ───────── 메인 화면 ───────── */
+function renderTabs(){
+  $('tabs').innerHTML = CATEGORIES.map((c,i) =>
+    `<button class="tab ${i === 0 ? 'on' : ''}" data-tab="${i}">${c}</button>`).join('');
+}
+
+function tileHTML(ex){
+  const idx = session.findIndex(s => s.exId === ex.id);
+  const entry = session[idx];
+  const logged = entry && !editing;
+  return `<button class="tile ${logged ? 'is-logged' : ''}" data-ex="${ex.id}"
+            aria-label="${esc(ex.name)}${editing ? ' 삭제' : ''}">
+    ${logged ? `<span class="tile-order">${idx + 1}</span>` : ''}
+    <span class="tile-name">${esc(ex.name)}</span>
+    ${logged ? `<span class="tile-meta">${entry.rows.length}줄</span>` : ''}
+  </button>`;
+}
+
+function renderList(){
+  const list = $('list');
+  list.classList.toggle('editing', editing);
+  list.innerHTML = CATEGORIES.map((cat, i) => {
+    const items = exercises.filter(e => e.cat === cat).sort(byName);
+    return `<section class="cat" id="cat-${i}" data-i="${i}">
+      <h2 class="cat-title">${cat}<span>${items.length}</span></h2>
+      <div class="grid">
+        ${items.map(tileHTML).join('')}
+        <button class="tile tile-add" data-add="${cat}"><span class="tile-name">+ ${cat}<br>운동 추가</span></button>
+      </div>
+    </section>`;
+  }).join('') + (editing ? `
+    <div class="backup">
+      <h2>운동 리스트 백업</h2>
+      <p>폰을 바꾸거나 앱을 지우면 리스트가 사라져요. 가끔 복사해서 카톡 나와의 채팅에 보내두면 언제든 되살릴 수 있어요.</p>
+      <div class="sheet-actions">
+        <button class="secondary" id="backupBtn">백업 복사하기</button>
+        <button class="secondary" id="restoreBtn">백업 불러오기</button>
+      </div>
+    </div>` : '');
+
+  const n = session.length;
+  $('convertBtn').disabled = n === 0;
+  $('convertBtn').textContent = n ? `텍스트로 변환하기 (${n}개 운동)` : '텍스트로 변환하기';
+  $('editBtn').textContent = editing ? '완료' : '편집';
+  saveSession();
+}
+
+$('list').addEventListener('click', e => {
+  if (e.target.closest('#backupBtn')) return backup();
+  if (e.target.closest('#restoreBtn')) return openSheet('restoreSheet', () => { $('restoreInput').value = ''; });
+  const add = e.target.closest('[data-add]');
+  if (add) return openAdd(add.dataset.add);
+  const tile = e.target.closest('[data-ex]');
+  if (!tile) return;
+  const id = tile.dataset.ex;
+  if (editing) return deleteExercise(id);
+  openExercise(id);
+});
+
+$('editBtn').onclick = () => { editing = !editing; renderList(); };
+
+// 실수로 지워도 토스트의 '되돌리기'로 원래 자리에 되살릴 수 있게
+function deleteExercise(id){
+  const exIdx = exercises.findIndex(x => x.id === id);
+  const sIdx = session.findIndex(s => s.exId === id);
+  const ex = exercises[exIdx], entry = session[sIdx];
+  exercises.splice(exIdx, 1);
+  if (entry) session.splice(sIdx, 1);
+  saveExercises();
+  renderList();
+  toast(`${ex.name} 삭제했어요`, { label:'되돌리기', run(){
+    if (exercises.some(x => x.id === ex.id || x.name === ex.name)) return;
+    exercises.splice(Math.min(exIdx, exercises.length), 0, ex);
+    if (entry) session.splice(Math.min(sIdx, session.length), 0, entry);
+    saveExercises();
+    renderList();
+    toast(`${ex.name} 되살렸어요`);
+  }});
+}
+
+/* 카테고리 탭: 누르면 이동, 스크롤하면 현재 위치 표시 */
+let spyPausedUntil = 0;
+function setTab(i){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', Number(t.dataset.tab) === i));
+}
+$('tabs').addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]');
+  if (!t) return;
+  const i = Number(t.dataset.tab);
+  setTab(i);
+  spyPausedUntil = Date.now() + 600;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  $(`cat-${i}`).scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+});
+window.addEventListener('scroll', () => {
+  if (Date.now() < spyPausedUntil) return;
+  const headH = $('head').offsetHeight;
+  let current = 0;
+  document.querySelectorAll('.cat').forEach(sec => {
+    if (sec.getBoundingClientRect().top - headH <= 40) current = Number(sec.dataset.i);
+  });
+  setTab(current);
+}, { passive:true });
+
+function measureHead(){
+  document.documentElement.style.setProperty('--head-h', `${$('head').offsetHeight}px`);
+}
+window.addEventListener('resize', measureHead);
+
+/* ───────── 시트 열고 닫기 ───────── */
+let openId = null;
+function openSheet(id, before){
+  before && before();
+  openId = id;
+  $(id).classList.add('open');
+  $('scrim').classList.add('open');
+  document.body.classList.add('locked');
+}
+function closeSheet(){
+  if (!openId) return;
+  if (openId === 'logSheet') finishExercise();
+  document.activeElement && document.activeElement.blur();
+  $(openId).classList.remove('open');
+  $('scrim').classList.remove('open');
+  document.body.classList.remove('locked');
+  openId = null;
+  disarmReset();
+}
+$('scrim').onclick = closeSheet;
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet);
+
+/* ───────── 운동 기록 시트 ───────── */
+function buildPickers(){
+  const make = (field, label, presets) => `
+    <div class="picker">
+      <span class="picker-label">${label}</span>
+      <div class="chips" data-chips="${field}">
+        ${presets.map(v => `<button class="chip" data-field="${field}" data-val="${v}">${v}</button>`).join('')}
+      </div>
+      <div class="step">
+        <button data-step="${field}" data-d="-1" aria-label="${label} 줄이기">−</button>
+        <button data-step="${field}" data-d="1"  aria-label="${label} 늘리기">+</button>
+      </div>
+    </div>`;
+  $('pickers').innerHTML = make('kg','kg',KG_PRESETS) + make('ea','ea',EA_PRESETS) + make('set','set',SET_PRESETS);
+}
+
+function openExercise(id){
+  const ex = exercises.find(x => x.id === id);
+  let entry = entryOf(id);
+  if (!entry){
+    entry = { exId:id, name:ex.name, rows:[{kg:null, ea:null, set:null}] };
+    session.push(entry);
+  }
+  activeExId = id;
+  activeRow = entry.rows.length - 1;
+  $('logTitle').textContent = ex.name;
+  renderSheet(true);
+  openSheet('logSheet');
+}
+
+function finishExercise(){
+  const entry = entryOf(activeExId);
+  if (entry){
+    entry.rows = entry.rows.filter(r => !isEmptyRow(r));
+    if (!entry.rows.length) session = session.filter(s => s !== entry);
+  }
+  activeExId = null;
+  renderList();
+}
+
+function renderSheet(centerChips){
+  const entry = entryOf(activeExId);
+  if (!entry) return;
+  $('rows').innerHTML = entry.rows.map((r,i) => `
+    <div class="row ${i === activeRow ? 'is-active' : ''}">
+      <button class="row-main" data-row="${i}" aria-label="${i+1}번째 줄 선택">
+        <span class="row-n">${i+1}</span>
+        <span class="v ${r.kg  == null ? 'empty' : ''}">${r.kg  == null ? 'kg'  : esc(fmtKg(r.kg))}</span>
+        <span class="v ${r.ea  == null ? 'empty' : ''}">${r.ea  == null ? 'ea'  : r.ea + 'ea'}</span>
+        <span class="v ${r.set == null ? 'empty' : ''}">${r.set == null ? 'set' : r.set + 'set'}</span>
+      </button>
+      <button class="row-del" data-rowdel="${i}" aria-label="${i+1}번째 줄 삭제">×</button>
+    </div>`).join('');
+
+  const r = entry.rows[activeRow] || {};
+  document.querySelectorAll('.chip[data-field]').forEach(c => {
+    c.classList.toggle('on', String(r[c.dataset.field]) === c.dataset.val);
+  });
+  if (centerChips){
+    document.querySelectorAll('[data-chips]').forEach(box => {
+      const on = box.querySelector('.chip.on');
+      box.scrollLeft = on ? on.offsetLeft - box.offsetLeft - box.clientWidth/2 + on.clientWidth/2 : 0;
+    });
+  }
+  const active = $('rows').querySelector('.row.is-active');
+  active && active.scrollIntoView({block:'nearest'});
+  saveSession();
+}
+
+$('rows').addEventListener('click', e => {
+  const entry = entryOf(activeExId);
+  const del = e.target.closest('[data-rowdel]');
+  if (del){
+    entry.rows.splice(Number(del.dataset.rowdel), 1);
+    if (!entry.rows.length) entry.rows.push({kg:null, ea:null, set:null});
+    activeRow = Math.min(activeRow, entry.rows.length - 1);
+    return renderSheet(true);
+  }
+  const row = e.target.closest('[data-row]');
+  if (row){ activeRow = Number(row.dataset.row); renderSheet(true); }
+});
+
+$('pickers').addEventListener('click', e => {
+  const entry = entryOf(activeExId);
+  const r = entry && entry.rows[activeRow];
+  if (!r) return;
+  const chip = e.target.closest('.chip');
+  if (chip){
+    r[chip.dataset.field] = parseVal(chip.dataset.val);
+    return renderSheet(false);
+  }
+  const st = e.target.closest('[data-step]');
+  if (st){
+    const f = st.dataset.step, d = Number(st.dataset.d) * STEP[f];
+    const cur = typeof r[f] === 'number' ? r[f] : 0;
+    const next = Math.round((cur + d) * 10) / 10;
+    r[f] = next <= 0 ? null : next;
+    renderSheet(true);
+  }
+});
+
+$('addRowBtn').onclick = () => {
+  const entry = entryOf(activeExId);
+  const base = entry.rows[activeRow] || entry.rows[entry.rows.length - 1];
+  entry.rows.splice(activeRow + 1, 0, { ...base });
+  activeRow += 1;
+  renderSheet(true);
+};
+
+/* ───────── 텍스트 변환 ───────── */
+function buildText(){
+  return session
+    .filter(s => s.rows.some(r => !isEmptyRow(r)))
+    .map(s => [s.name, ...s.rows.filter(r => !isEmptyRow(r)).map(rowText)].join('\n'))
+    .join('\n');
+}
+$('convertBtn').onclick = () => openSheet('outSheet', () => { $('outText').textContent = buildText(); });
+
+async function copyText(text, msg){
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  toast(msg);
+}
+$('copyBtn').onclick = () => copyText(buildText(), '복사했어요. 카톡에 붙여넣으면 돼요');
+$('shareBtn').onclick = async () => {
+  const text = buildText();
+  if (navigator.share){ try { await navigator.share({ text }); } catch {} }
+  else copyText(text, '복사했어요. 카톡에 붙여넣으면 돼요');
+};
+
+// 실수로 지우지 않게 두 번 눌러야 초기화
+let resetArmed = false;
+function disarmReset(){ resetArmed = false; $('resetBtn').classList.remove('armed'); $('resetBtn').textContent = '새 기록 시작'; }
+$('resetBtn').onclick = () => {
+  if (!resetArmed){
+    resetArmed = true;
+    $('resetBtn').classList.add('armed');
+    $('resetBtn').textContent = '한 번 더 누르면 오늘 기록이 지워져요';
+    return;
+  }
+  session = [];
+  closeSheet();
+  renderList();
+  window.scrollTo(0,0);
+  toast('새 기록을 시작했어요');
+};
+
+/* ───────── 운동 추가 ───────── */
+function renderCatPick(){
+  $('catPick').innerHTML = CATEGORIES.map(c =>
+    `<button class="chip ${c === addCat ? 'on' : ''}" data-addcat="${c}">${c}</button>`).join('');
+}
+function openAdd(cat){
+  addCat = cat;
+  openSheet('addSheet', () => { renderCatPick(); $('addInput').value = ''; });
+  setTimeout(() => $('addInput').focus(), 250);
+}
+$('catPick').addEventListener('click', e => {
+  const c = e.target.closest('[data-addcat]');
+  if (c){ addCat = c.dataset.addcat; renderCatPick(); }
+});
+function addExercise(){
+  const name = $('addInput').value.trim();
+  if (!name) return $('addInput').focus();
+  if (exercises.some(x => x.name === name)){ toast('이미 있는 운동이에요'); return; }
+  exercises.push({ id:uid(), name, cat:addCat });
+  saveExercises();
+  closeSheet();
+  renderList();
+  toast(`${addCat}에 ${name} 추가했어요`);
+}
+$('addSaveBtn').onclick = addExercise;
+$('addInput').addEventListener('keydown', e => { if (e.key === 'Enter') addExercise(); });
+
+/* ───────── 백업 / 불러오기 ───────── */
+function backup(){
+  const data = { app:'pt-log', v:1, exercises: exercises.map(({name,cat}) => ({name,cat})) };
+  copyText(JSON.stringify(data), '백업을 복사했어요. 카톡 나와의 채팅에 붙여넣어 두세요');
+}
+$('restoreSaveBtn').onclick = () => {
+  try {
+    const data = JSON.parse($('restoreInput').value.trim());
+    if (data.app !== 'pt-log' || !Array.isArray(data.exercises)) throw 0;
+    const list = data.exercises
+      .filter(x => x && typeof x.name === 'string' && x.name.trim())
+      .map(x => ({ id:uid(), name:x.name.trim(), cat: CATEGORIES.includes(x.cat) ? x.cat : CATEGORIES[CATEGORIES.length-1] }));
+    if (!list.length) throw 0;
+    exercises = list;
+    session = session.filter(s => exercises.some(e => e.name === s.name))
+                     .map(s => ({ ...s, exId: exercises.find(e => e.name === s.name).id }));
+    saveExercises();
+    closeSheet();
+    renderList();
+    toast(`운동 ${list.length}개를 불러왔어요`);
+  } catch {
+    toast('백업 내용을 읽지 못했어요. 복사한 내용 전체를 붙여넣어 주세요');
+  }
+};
+
+/* ───────── 기타 ───────── */
+let toastTimer;
+function hideToast(){ $('toast').classList.remove('show'); }
+// action: { label, run } — 넘기면 토스트에 버튼이 붙고 조금 더 오래 떠 있어요
+function toast(msg, action){
+  const t = $('toast');
+  t.textContent = '';
+  const text = document.createElement('span');
+  text.textContent = msg;
+  t.append(text);
+  if (action){
+    const b = document.createElement('button');
+    b.className = 'toast-btn';
+    b.textContent = action.label;
+    b.onclick = () => { hideToast(); action.run(); };
+    t.append(b);
+  }
+  t.classList.toggle('has-action', !!action);
+  t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, action ? 4500 : 2200);
+}
+
+(function init(){
+  const d = new Date();
+  $('today').textContent = `${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`;
+  buildPickers();
+  renderTabs();
+
+  const saved = store.get('exercises');
+  exercises = saved || CATEGORIES.flatMap(cat => (DEFAULT_EXERCISES[cat] || []).map(name => ({ id:uid(), name, cat })));
+  if (!saved) saveExercises();
+  session = store.get('session') || [];
+  session = session.filter(s => exercises.some(e => e.id === s.exId));
+
+  renderList();
+  measureHead();
+
+  // 저장 공간이 부족할 때도 이 앱 데이터는 지우지 말아달라고 브라우저에 요청
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol === 'https:'){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
