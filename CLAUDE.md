@@ -38,6 +38,8 @@ claude.ai 채팅에서 기획·프로토타입까지 진행했고, 이 파일은
 - 앱 형태: PWA, 홈 화면에 추가해서 사용 (홈 화면 PWA는 Safari 7일 삭제 정책 대상 아님).
 - 서비스워커: "GitHub는 설치·업데이트만, 실제 실행은 폰에 저장된 버전". 캐시 우선으로 바로 열고 뒤에서 새 버전을 받아 다음 실행 때 적용(stale-while-revalidate). 200일 때만 캐시 갱신 → 사이트가 사라지거나 오프라인이어도 설치된 앱은 계속 열린다. 네트워크를 기다리지 않으므로 로딩바는 필요 없음. 배포할 때마다 `sw.js`의 `CACHE` 버전을 올릴 것.
 - 배포: GitHub Pages, 개인 계정에 올린다 (Organization은 쓰지 않기로 함).
+  - 주소: https://yezzero.github.io/pt-log/ (저장소 https://github.com/yezzero/pt-log, main 브랜치 루트에서 배포)
+  - 재배포: `sw.js`의 `CACHE` 버전을 올리고 main에 push하면 1~2분 뒤 반영. 폰에는 그다음 실행 때가 아니라 그 다음다음 실행 때 보인다(뒤에서 받아 두었다가 적용).
   - 배포 후 URL(출처)이 바뀌면 localStorage 데이터에 접근할 수 없으므로 저장소 이름과 GitHub 사용자명은 바꾸지 않는다.
 - 하단 여백: `--safe-b = max(safe-area-inset-bottom, 16px)`. PWA가 아닌 일반 브라우저에서도 하단 버튼이 화면 끝에 붙지 않게.
 
