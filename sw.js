@@ -1,7 +1,7 @@
 // 앱은 폰에 저장된 버전으로 바로 열고, GitHub에서는 설치·업데이트만 받아옵니다.
 // 사이트가 없어지거나 오프라인이어도 설치된 앱은 계속 열려요.
 // 파일을 수정해 배포할 때는 CACHE 이름의 버전을 올려주세요.
-const CACHE = 'pt-log-v5';
+const CACHE = 'pt-log-v6';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
